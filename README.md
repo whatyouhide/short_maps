@@ -1,5 +1,7 @@
 # ShortMaps
 
+[![Build Status](https://travis-ci.org/whatyouhide/short_maps.svg?branch=master)](https://travis-ci.org/whatyouhide/short_maps)
+
 Implementation of a `~m` sigil for ES6-like maps in Elixir.
 
 ## Rationale
