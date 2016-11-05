@@ -38,23 +38,42 @@ defmodule ShortMaps do
       Test.test %{foo: "hello world"} #=> "hello world"
       Test.test %{bar: "hey there!"}  #=> :no_match
 
+  ## Modifiers
+
+  The `~m` sigil supports both maps with atom keys as well as string keys. Atom
+  keys can be specified using the `a` modifier, while string keys can be
+  specified with the `s` modifier (which is the default).
+
+      iex> ~m(my_key)s = %{"my_key" => "my value"}
+      iex> my_key
+      "my value"
+
+      iex> ~m(my_key)a = %{my_key: "my value"}
+      iex> my_key
+      "my value"
+
   ## Pinning
 
   Matching using the `~m` sigil has full support for the pin operator:
 
-      bar = "bar"
-      ~m(foo ^bar) = %{foo: "foo", bar: "bar"} #=> this is ok, `bar` matches
-      foo #=> "foo"
-      bar #=> "bar"
-      ~m(foo ^bar) = %{foo: "FOO", bar: "bar"} #=> this is still ok
-      foo #=> "FOO"; since we didn't pin it, it's now bound to a new value
-      bar #=> "bar"
-      ~m(foo ^bar) = %{foo: "foo", bar: "BAR"} #=> will raise MatchError
+      iex> bar = "bar"
+      iex> ~m(foo ^bar)a = %{foo: "foo", bar: "bar"} #=> this is ok, `bar` matches
+      iex> foo
+      "foo"
+      iex> bar
+      "bar"
+      iex> ~m(foo ^bar)a = %{foo: "FOO", bar: "bar"}
+      iex> foo # still ok, since we didn't pin `foo`, it's now bound to a new value
+      "FOO"
+      iex> bar
+      "bar"
+      iex> ~m(^bar)a = %{foo: "foo", bar: "BAR"}
+      ** (MatchError) no match of right hand side value: %{bar: "BAR", foo: "foo"}
 
   ## Structs
 
-  For using structs instead of plain maps, the first word must be prefixed with
-  '%':
+  For using structs instead of plain maps, the first word must be the struct
+  name prefixed with `%`:
 
       defmodule Foo do
         defstruct bar: nil
@@ -63,16 +82,8 @@ defmodule ShortMaps do
       ~m(%Foo bar)a = %Foo{bar: 4711}
       bar #=> 4711
 
-  _NOTE: Structs only support atom keys, so you must use the 'a' modifier._
-
-  ## Modifiers
-
-  The `~m` sigil supports both maps with atom keys as well as string keys. Atom
-  keys can be specified using the `a` modifier, while string keys can be
-  specified with the `s` modifier (which is the default).
-
-      ~m(my_key)s = %{"my_key" => "my value"}
-      my_key #=> "my value"
+  Structs only support atom keys, so you **must** use the `a` modifier or an
+  exception will be raised.
 
   ## Pitfalls
 
@@ -96,31 +107,31 @@ defmodule ShortMaps do
   defmacro sigil_m(term, modifiers)
 
   defmacro sigil_m({:<<>>, line, [string]}, modifiers) do
-    do_sigil_m(line, String.split(string), modifier(modifiers), __CALLER__)
+    sigil_m_function(line, String.split(string), modifier(modifiers), __CALLER__)
   end
 
   defmacro sigil_m({:<<>>, _, _}, _modifiers) do
     raise ArgumentError, "interpolation is not supported with the ~m sigil"
   end
 
-
-  defp do_sigil_m(_line, ["%" <> _struct_name | _words], ?s, _caller),
-    do: raise(ArgumentError, "structs can only consist of atom keys")
-  defp do_sigil_m(_line, ["%" <> struct_name | words], ?a, caller) do
-    struct = resolve_module(struct_name, caller)
-    pairs = make_pairs(words, ?a)
-    quote do: %unquote(struct){unquote_splicing(pairs)}
+  # We raise when the modifier is ?s and we're trying to build a struct.
+  defp sigil_m_function(_line, ["%" <> _struct_name | _rest], ?s, _caller) do
+    raise ArgumentError, "structs can only consist of atom keys"
   end
-  defp do_sigil_m(line, words, modifier, _caller) do
+
+  defp sigil_m_function(_lin, ["%" <> struct_name | rest], ?a, caller) do
+    struct_module_quoted = resolve_module(struct_name, caller)
+    pairs = make_pairs(rest, ?a)
+    quote do: %unquote(struct_module_quoted){unquote_splicing(pairs)}
+  end
+
+  defp sigil_m_function(line, words, modifier, _caller) do
     pairs = make_pairs(words, modifier)
     {:%{}, line, pairs}
   end
 
-  defp resolve_module("__MODULE__", caller) do
-    {:__MODULE__, [], caller.module}
-  end
-  defp resolve_module(struct_name, _caller) do
-    {:__aliases__, [], [String.to_atom(struct_name)]}
+  defp resolve_module(struct_name, env) do
+    Code.string_to_quoted!(struct_name, file: env.file, line: env.line)
   end
 
   defp make_pairs(words, modifier) do

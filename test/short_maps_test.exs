@@ -1,30 +1,27 @@
 defmodule ShortMapsTest do
   use ExUnit.Case, async: true
+  doctest ShortMaps, import: true
+
   import ShortMaps
 
   test "uses the bindings from the current environment" do
     foo = 1
     assert ~m(foo)a == %{foo: 1}
+    assert ~m(foo) == %{"foo" => 1}
   end
 
-  test "can be used in regular matches" do
+  test "can be used in pattern matches, where it binds variables" do
     assert ~m(foo)a = %{foo: "bar"}
-    foo # this removes the "variable foo is unused" warning
-  end
-
-  test "when used in pattern matches, it binds variables in the scope" do
-    ~m(foo)a = %{foo: "bar"}
     assert foo == "bar"
   end
 
-  test "pin syntax in pattern matches will match on same value" do
+  test "supports the ^pin syntax in pattern matches to match on a variable's value" do
     foo = "bar"
-    assert ~m(^foo)a = %{foo: "bar"}
-  end
 
-  test "pin syntax in pattern matches will raise if no match" do
-    msg = "no match of right hand side value: %{foo: \"baaz\"}"
-    assert_raise MatchError, msg, fn ->
+    assert ~m(^foo)a = %{foo: "bar"}
+
+    message = "no match of right hand side value: %{foo: \"baaz\"}"
+    assert_raise MatchError, message, fn ->
       foo = "bar"
       ~m(^foo)a = %{foo: "baaz"}
     end
@@ -32,85 +29,105 @@ defmodule ShortMapsTest do
 
   test "can be used in function heads for anonymoys functions" do
     fun = fn
-      ~m(foo)a -> foo
-      _       -> :no_match
+      ~m(foo)a ->
+        {:matched, foo}
+      _ ->
+        :no_match
     end
 
-    assert fun.(%{foo: "bar"}) == "bar"
+    assert fun.(%{foo: "bar"}) == {:matched, "bar"}
     assert fun.(%{baz: "bong"}) == :no_match
   end
 
   test "can be used in function heads for functions in modules" do
     defmodule FunctionHead do
-      def test(~m(foo)a), do: foo
-      def test(_),       do: :no_match
+      def test(~m(foo)a), do: {:matched, foo}
+      def test(_other), do: :no_match
     end
 
-    assert FunctionHead.test(%{foo: "bar"}) == "bar"
+    assert FunctionHead.test(%{foo: "bar"}) == {:matched, "bar"}
     assert FunctionHead.test(%{baz: "bong"}) == :no_match
+  after
+    :code.delete(FunctionHead)
+    :code.purge(FunctionHead)
   end
 
   test "supports atom keys with the 'a' modifier" do
-    assert ~m(foo bar)a = %{foo: "foo", bar: "bar"}
-    assert {foo, bar} == {"foo", "bar"}
+    # For matching
+    assert ~m(foo bar)a = %{foo: "hello", bar: "world"}
+    assert foo == "hello"
+    assert bar == "world"
+
+    # For using the variables from the current environment
+    assert ~m(foo bar)a == %{foo: "hello", bar: "world"}
   end
 
   test "supports string keys with the 's' modifier" do
+    # For matching
     assert ~m(foo bar)s = %{"foo" => "hello", "bar" => "world"}
-    assert {foo, bar} == {"hello", "world"}
+    assert foo == "hello"
+    assert bar == "world"
+
+    # For using the variables from the current environment
+    assert ~m(foo bar)s == %{"foo" => "hello", "bar" => "world"}
   end
 
   test "wrong modifiers raise an ArgumentError" do
     code = quote do: ~m(foo)k
-    msg = "only these modifiers are supported: s, a"
-    assert_raise ArgumentError, msg, fn -> Code.eval_quoted(code) end
+    message = "only these modifiers are supported: s, a"
+    assert_raise ArgumentError, message, fn -> Code.eval_quoted(code) end
   end
 
   test "no interpolation is supported" do
     code = quote do: ~m(foo #{bar} baz)a
-    msg = "interpolation is not supported with the ~m sigil"
-    assert_raise ArgumentError, msg, fn -> Code.eval_quoted(code) end
+    message = "interpolation is not supported with the ~m sigil"
+    assert_raise ArgumentError, message, fn -> Code.eval_quoted(code) end
   end
 
   test "good errors when variables are invalid" do
     code = quote do: ~m(4oo)
-    msg = "invalid variable name: 4oo"
-    assert_raise ArgumentError, msg, fn -> Code.eval_quoted(code) end
+    message = "invalid variable name: 4oo"
+    assert_raise ArgumentError, message, fn -> Code.eval_quoted(code) end
 
     code = quote do: ~m($hello!)
-    msg = "invalid variable name: $hello!"
-    assert_raise ArgumentError, msg, fn -> Code.eval_quoted(code) end
+    message = "invalid variable name: $hello!"
+    assert_raise ArgumentError, message, fn -> Code.eval_quoted(code) end
   end
 
-  defmodule Foo do
-    defstruct bar: nil
+  defmodule MyStruct do
+    defstruct my_field: nil
   end
 
   test "supports structs" do
-    bar = 1
-    assert ~m(%Foo bar)a == %Foo{bar: 1}
+    my_field = "hello"
+    assert ~m(%MyStruct my_field)a == %MyStruct{my_field: "hello"}
   end
 
-  test "struct syntax can be used in regular matches" do
-    assert ~m(%Foo bar)a = %Foo{bar: "123"}
-    bar # this removes the "variable bar is unused" warning
+  test "struct syntax can be used in pattern matches" do
+    assert ~m(%MyStruct my_field)a = %MyStruct{my_field: "123"}
+    assert my_field == "123"
   end
 
   test "when using structs, fails on non-existing keys" do
-    code = quote do: ~m(%Foo bar baaz)a = %Foo{bar: 1}
-    msg = ~r/unknown key :baaz for struct ShortMapsTest.Foo/
-    assert_raise CompileError, msg, fn ->
+    code = quote do: ~m(%MyStruct my_field wat)a = %MyStruct{my_field: 1}
+    message = ~r/unknown key :wat for struct ShortMapsTest.MyStruct/
+    assert_raise CompileError, message, fn ->
       Code.eval_quoted(code, [], __ENV__)
     end
   end
 
-  test "when using structs, only accepts 'a' modifier" do
+  test "when using structs, only accepts 'a' modifier and raises for other modifiers" do
     code = quote do
-      bar = 5
-      ~m(%Foo bar)s
+      my_field = "hello"
+      ~m(%MyStruct my_field)s
     end
-    msg = "structs can only consist of atom keys"
-    assert_raise ArgumentError, msg, fn -> Code.eval_quoted(code) end
+    message = "structs can only consist of atom keys"
+    assert_raise ArgumentError, message, fn -> Code.eval_quoted(code) end
+  end
+
+  test "when using structs, works with __MODULE__" do
+    assert ~m(%__MODULE__.MyStruct my_field)a = %MyStruct{my_field: "hello"}
+    assert my_field == "hello"
   end
 
   defmodule UseInsideStruct do
