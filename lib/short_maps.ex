@@ -1,8 +1,6 @@
 defmodule ShortMaps do
   @default_modifier ?s
 
-  @first_letter_uppercase ~r/^\p{Lu}/u
-
   @doc ~S"""
   Returns a map with the given keys bound to variables with the same name.
 
