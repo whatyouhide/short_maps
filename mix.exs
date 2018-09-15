@@ -3,6 +3,7 @@ defmodule ShortMaps.Mixfile do
 
   @version "0.1.2"
   @repo_url "https://github.com/whatyouhide/short_maps"
+  @blog_post_url "https://andrealeopardi.com/posts/a-story-of-regret-and-retiring-a-library-from-hex/"
 
   def project() do
     [app: :short_maps,
@@ -26,7 +27,7 @@ defmodule ShortMaps.Mixfile do
   defp hex_package() do
     [maintainers: ["Andrea Leopardi"],
      licenses: ["MIT"],
-     links: %{"GitHub" => @repo_url}]
+     links: %{"GitHub" => @repo_url, "Why I retired short_maps" => @blog_post_url}]
   end
 
   defp deps() do
