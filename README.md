@@ -3,6 +3,8 @@
 [![Build Status](https://travis-ci.org/whatyouhide/short_maps.svg?branch=master)](https://travis-ci.org/whatyouhide/short_maps)
 [![Hex.pm](https://img.shields.io/hexpm/v/short_maps.svg)](https://hex.pm/packages/short_maps)
 
+> short_maps has been retired from Hex. Read more about it [in this blog post]("https://andrealeopardi.com/posts/a-story-of-regret-and-retiring-a-library-from-hex/").
+
 Implementation of a `~m` sigil for ES6-like maps in Elixir.
 
 ## Rationale
