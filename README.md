@@ -1,6 +1,6 @@
 # ShortMaps
 
-> ⚠️ **Important**: short_maps has been retired from Hex. Read more about it [in this blog post](https://andrealeopardi.com/posts/a-story-of-regret-and-retiring-a-library-from-hex/). ⚠️
+> ⚠️ **Important**: short_maps has been retired from Hex. Read more about it [in this blog post](https://andrealeopardi.com/posts/a-story-of-regret-and-retiring-a-library-from-hex/). The repository is also archived. If you have an issue with short_maps, please send me an [email](mailto:an.leopardi@gmail.com). ⚠️
 
 Implementation of a `~m` sigil for ES6-like maps in Elixir.
 
